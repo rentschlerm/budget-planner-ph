@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, ui } from '../theme';
 import { peso, toNumber, uid } from '../utils';
-import { ProgressBar, SheetModal } from '../components';
+import { ProgressBar, SheetModal, ScreenHeader, AmountInput, EmptyState } from '../components';
 
 export default function MoveInScreen({ data, update }) {
   const [editing, setEditing] = useState(null);
-  const [savedText, setSavedText] = useState(String(data.moveInSaved || ''));
+  const [savedText, setSavedText] = useState(data.moveInSaved ? String(data.moveInSaved) : '');
 
   const items = data.moveIn || [];
   const total = items.reduce((s, i) => s + i.amount, 0);
   const paid = items.filter((i) => i.paid).reduce((s, i) => s + i.amount, 0);
   const saved = data.moveInSaved || 0;
+  const covered = Math.min(paid + saved, total);
   const stillNeeded = Math.max(total - paid - saved, 0);
+  const pct = total > 0 ? Math.round((covered / total) * 100) : 0;
 
-  const monthlySavings = data.categories
-    .filter((c) => c.group === 'savings')
-    .reduce((s, c) => s + (c.planned || 0), 0);
+  const monthlySavings = data.categories.filter((c) => c.group === 'savings').reduce((s, c) => s + (c.planned || 0), 0);
   const monthsToGo = monthlySavings > 0 ? Math.ceil(stillNeeded / monthlySavings) : null;
 
-  const toggle = (id) =>
-    update((d) => ({ ...d, moveIn: d.moveIn.map((i) => (i.id === id ? { ...i, paid: !i.paid } : i)) }));
+  const toggle = (id) => update((d) => ({ ...d, moveIn: d.moveIn.map((i) => (i.id === id ? { ...i, paid: !i.paid } : i)) }));
 
   const saveItem = (item) =>
     update((d) => {
@@ -41,89 +41,131 @@ export default function MoveInScreen({ data, update }) {
       },
     ]);
 
+  const unpaid = items.filter((i) => !i.paid);
+  const done = items.filter((i) => i.paid);
+
   return (
-    <ScrollView style={ui.screen} contentContainerStyle={ui.content} keyboardShouldPersistTaps="handled">
-      <Text style={ui.h1}>Move-in fund</Text>
-      <Text style={[ui.muted, { marginBottom: 12 }]}>One-time costs before and during the move. Tick items as you pay them.</Text>
+    <View style={ui.screen}>
+      <ScreenHeader title="Move-in fund" subtitle="One-time costs to get you moved in" />
+      <ScrollView contentContainerStyle={ui.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={[ui.card, { backgroundColor: colors.primaryDark }]}>
+          <View style={ui.between}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#99f6e4', fontSize: 13, fontWeight: '600' }}>{stillNeeded > 0 ? 'STILL NEEDED' : 'ALL SET'}</Text>
+              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 2 }}>
+                {stillNeeded > 0 ? peso(stillNeeded) : '🎉 Funded'}
+              </Text>
+              <Text style={{ color: '#ccfbf1', fontSize: 13, marginTop: 2 }}>of {peso(total)} total</Text>
+            </View>
+            <Ring pct={pct} />
+          </View>
+          <View style={{ marginTop: 14 }}>
+            <ProgressBar value={covered} max={total} height={8} color="#5eead4" track="rgba(255,255,255,0.15)" />
+          </View>
+          <View style={[ui.between, { marginTop: 10 }]}>
+            <Text style={{ color: '#ccfbf1', fontSize: 13 }}>Paid {peso(paid)}</Text>
+            <Text style={{ color: '#ccfbf1', fontSize: 13 }}>Saved {peso(saved)}</Text>
+          </View>
+          {stillNeeded > 0 && monthsToGo ? (
+            <View style={[ui.row, { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 10 }]}>
+              <Ionicons name="time-outline" size={16} color="#99f6e4" />
+              <Text style={{ color: '#ccfbf1', fontSize: 13, marginLeft: 8, flex: 1 }}>
+                At {peso(monthlySavings)}/month in savings, you'll be ready in about{' '}
+                <Text style={{ color: '#fff', fontWeight: '800' }}>{monthsToGo} month{monthsToGo === 1 ? '' : 's'}</Text>
+              </Text>
+            </View>
+          ) : null}
+        </View>
 
-      <View style={ui.card}>
-        <View style={ui.between}>
-          <Text style={ui.muted}>Total move-in cost</Text>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text }}>{peso(total)}</Text>
-        </View>
-        <View style={{ marginVertical: 10 }}>
-          <ProgressBar value={paid + saved} max={total} height={12} color={colors.good} />
-        </View>
-        <View style={ui.between}>
-          <Text style={ui.muted}>Paid {peso(paid)} · Saved {peso(saved)}</Text>
-          <Text style={{ fontWeight: '700', color: stillNeeded > 0 ? colors.warn : colors.good }}>
-            {stillNeeded > 0 ? `${peso(stillNeeded)} to go` : 'Fully funded 🎉'}
-          </Text>
+        <View style={ui.card}>
+          <Text style={ui.h2}>Cash set aside for the move</Text>
+          <Text style={ui.muted}>Money you've saved but haven't spent yet</Text>
+          <View style={[ui.row, ui.input, { marginTop: 12, paddingVertical: 2 }]}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.muted, marginRight: 6 }}>₱</Text>
+            <TextInput
+              style={{ flex: 1, fontSize: 18, fontWeight: '700', color: colors.text, paddingVertical: 10 }}
+              keyboardType="decimal-pad"
+              value={savedText}
+              onChangeText={(t) => {
+                setSavedText(t);
+                update((d) => ({ ...d, moveInSaved: toNumber(t) }));
+              }}
+              placeholder="0"
+              placeholderTextColor={colors.muted}
+            />
+          </View>
         </View>
 
-        <Text style={ui.label}>Cash already set aside for the move (₱)</Text>
-        <TextInput
-          style={ui.input}
-          keyboardType="decimal-pad"
-          value={savedText}
-          onChangeText={(t) => {
-            setSavedText(t);
-            update((d) => ({ ...d, moveInSaved: toNumber(t) }));
-          }}
-          placeholder="0"
-        />
-        {stillNeeded > 0 && monthsToGo ? (
-          <Text style={[ui.muted, { marginTop: 10 }]}>
-            At your planned savings of {peso(monthlySavings)}/month, you'd cover the rest in about {monthsToGo}{' '}
-            month{monthsToGo === 1 ? '' : 's'}.
-          </Text>
+        <ItemList title={`To pay · ${unpaid.length}`} items={unpaid} onToggle={toggle} onEdit={setEditing} />
+        {done.length ? <ItemList title={`Paid · ${done.length}`} items={done} onToggle={toggle} onEdit={setEditing} /> : null}
+        {items.length === 0 ? (
+          <View style={ui.card}>
+            <EmptyState icon="cube-outline" title="No items yet" text="Add the things you need to buy or pay for before moving." />
+          </View>
         ) : null}
-      </View>
 
-      <View style={ui.card}>
-        {items.map((i) => (
-          <View key={i.id} style={[ui.row, { paddingVertical: 10 }]}>
-            <TouchableOpacity onPress={() => toggle(i.id)} hitSlop={10} style={{ marginRight: 12 }}>
+        <TouchableOpacity style={ui.btn} onPress={() => setEditing({})} activeOpacity={0.85}>
+          <Ionicons name="add" size={20} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={ui.btnText}>Add item</Text>
+        </TouchableOpacity>
+
+        <ItemModal visible={!!editing} item={editing} onClose={() => setEditing(null)} onSave={saveItem} onDelete={deleteItem} />
+      </ScrollView>
+    </View>
+  );
+}
+
+function ItemList({ title, items, onToggle, onEdit }) {
+  if (!items.length) return null;
+  return (
+    <>
+      <Text style={[ui.label, { marginLeft: 4, marginTop: 4 }]}>{title}</Text>
+      <View style={[ui.card, { paddingVertical: 4 }]}>
+        {items.map((i, idx) => (
+          <View key={i.id} style={[ui.row, { paddingVertical: 12, borderTopWidth: idx ? 1 : 0, borderTopColor: colors.track }]}>
+            <TouchableOpacity onPress={() => onToggle(i.id)} hitSlop={10} style={{ marginRight: 12 }}>
               <View
                 style={{
-                  width: 24, height: 24, borderRadius: 6, borderWidth: 2,
+                  width: 26, height: 26, borderRadius: 9, borderWidth: 2,
                   borderColor: i.paid ? colors.good : colors.border,
                   backgroundColor: i.paid ? colors.good : '#fff',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                {i.paid ? <Text style={{ color: '#fff', fontWeight: '900' }}>✓</Text> : null}
+                {i.paid ? <Ionicons name="checkmark" size={18} color="#fff" /> : null}
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={[ui.between, { flex: 1 }]} onPress={() => setEditing(i)}>
+            <TouchableOpacity style={[ui.between, { flex: 1 }]} onPress={() => onEdit(i)} activeOpacity={0.6}>
               <Text
                 style={{
-                  flex: 1, fontSize: 15, paddingRight: 8,
+                  flex: 1, fontSize: 15, paddingRight: 8, fontWeight: '500',
                   color: i.paid ? colors.muted : colors.text,
                   textDecorationLine: i.paid ? 'line-through' : 'none',
                 }}
               >
                 {i.name}
               </Text>
-              <Text style={{ fontWeight: '600', color: i.paid ? colors.muted : colors.text }}>{peso(i.amount)}</Text>
+              <Text style={{ fontWeight: '700', color: i.paid ? colors.muted : colors.text }}>{peso(i.amount)}</Text>
             </TouchableOpacity>
           </View>
         ))}
-        {items.length === 0 ? <Text style={ui.muted}>No items yet.</Text> : null}
       </View>
+    </>
+  );
+}
 
-      <TouchableOpacity style={ui.btn} onPress={() => setEditing({})}>
-        <Text style={ui.btnText}>+ Add item</Text>
-      </TouchableOpacity>
-
-      <ItemModal
-        visible={!!editing}
-        item={editing}
-        onClose={() => setEditing(null)}
-        onSave={saveItem}
-        onDelete={deleteItem}
-      />
-    </ScrollView>
+// Simple percentage badge (no SVG dependency).
+function Ring({ pct }) {
+  return (
+    <View
+      style={{
+        width: 72, height: 72, borderRadius: 36, borderWidth: 6,
+        borderColor: pct >= 100 ? '#5eead4' : 'rgba(255,255,255,0.18)',
+        alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 18 }}>{pct}%</Text>
+    </View>
   );
 }
 
@@ -146,16 +188,17 @@ function ItemModal({ visible, item, onClose, onSave, onDelete }) {
   };
 
   return (
-    <SheetModal visible={visible} onClose={onClose} title={isNew ? 'New move-in item' : 'Edit item'}>
+    <SheetModal visible={visible} onClose={onClose} title={isNew ? 'New item' : 'Edit item'}>
+      <AmountInput value={amount} onChangeText={setAmount} autoFocus={isNew} />
+      <Text style={[ui.muted, { textAlign: 'center', marginTop: -4 }]}>estimated cost</Text>
       <Text style={ui.label}>Item</Text>
-      <TextInput style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Curtains" />
-      <Text style={ui.label}>Estimated cost (₱)</Text>
-      <TextInput style={ui.input} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="0" />
-      <TouchableOpacity style={[ui.btn, { marginTop: 20 }]} onPress={save}>
+      <TextInput style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Curtains" placeholderTextColor={colors.muted} />
+      <TouchableOpacity style={[ui.btn, { marginTop: 24 }]} onPress={save} activeOpacity={0.85}>
         <Text style={ui.btnText}>Save</Text>
       </TouchableOpacity>
       {!isNew ? (
-        <TouchableOpacity style={[ui.btnGhost, { marginTop: 10 }]} onPress={() => onDelete(item.id)}>
+        <TouchableOpacity style={[ui.btnGhost, { marginTop: 10, backgroundColor: colors.dangerSoft, elevation: 0, shadowOpacity: 0 }]} onPress={() => onDelete(item.id)}>
+          <Ionicons name="trash-outline" size={18} color={colors.danger} style={{ marginRight: 6 }} />
           <Text style={[ui.btnGhostText, { color: colors.danger }]}>Remove item</Text>
         </TouchableOpacity>
       ) : null}
