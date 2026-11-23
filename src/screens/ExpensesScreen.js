@@ -31,7 +31,7 @@ export default function ExpensesScreen({ data, month, setMonth, onEditExpense })
 
   return (
     <View style={ui.screen}>
-      <ScreenHeader title="Expenses" subtitle="Tap an entry to edit or delete it" />
+      <ScreenHeader title="History" subtitle="Tap an entry to edit or delete it" />
       <ScrollView contentContainerStyle={ui.content} showsVerticalScrollIndicator={false}>
         <MonthSwitcher label={monthLabel(month)} onPrev={() => setMonth(shiftMonth(month, -1))} onNext={() => setMonth(shiftMonth(month, 1))} />
 
@@ -82,7 +82,7 @@ export default function ExpensesScreen({ data, month, setMonth, onEditExpense })
                           <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>
                             {e.note || (c ? c.name : 'Deleted category')}
                           </Text>
-                          <Text style={ui.muted} numberOfLines={1}>{c ? c.name : 'Deleted category'}</Text>
+                          <Text style={ui.muted} numberOfLines={1}>{c ? c.name : 'Deleted category'}{e.source === 'receipt' ? '  ·  📷 receipt' : ''}</Text>
                         </View>
                         <Text style={{ fontWeight: '700', color: colors.text, fontSize: 15 }}>-{peso(e.amount, true)}</Text>
                       </TouchableOpacity>

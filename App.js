@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,26 +7,35 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { loadData, saveData } from './src/storage';
 import { DEFAULT_DATA } from './src/defaults';
-import { currentMonth } from './src/utils';
+import { currentMonth, todayISO, peso, uid, inMonth } from './src/utils';
 import { colors, shadow } from './src/theme';
-import { ExpenseModal } from './src/components';
+import { ExpenseModal, Toast } from './src/components';
 import { autoCheckForUpdate } from './src/updater';
+import { pickReceiptImage, readReceipt } from './src/receipt';
 import HomeScreen from './src/screens/HomeScreen';
 import ExpensesScreen from './src/screens/ExpensesScreen';
 import BudgetScreen from './src/screens/BudgetScreen';
 import MoveInScreen from './src/screens/MoveInScreen';
+import SetupScreen from './src/screens/SetupScreen';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
-  { key: 'expenses', label: 'Expenses', icon: 'receipt' },
+  { key: 'expenses', label: 'History', icon: 'receipt' },
   { key: 'add', label: '', icon: 'add' }, // centre add button
-  { key: 'budget', label: 'Budget', icon: 'wallet' },
+  { key: 'budget', label: 'Plan', icon: 'wallet' },
   { key: 'movein', label: 'Move-in', icon: 'cube' },
 ];
 
 const fresh = () => JSON.parse(JSON.stringify(DEFAULT_DATA));
+
+// Bring older saved data up to date without losing anything.
+function migrate(stored) {
+  const d = { ...fresh(), ...stored };
+  if (stored.setupDone === undefined) d.setupDone = (stored.expenses || []).length > 0;
+  return d;
+}
 
 export default function App() {
   return (
@@ -43,10 +52,15 @@ function Main() {
   const [month, setMonth] = useState(currentMonth());
   const [expenseDraft, setExpenseDraft] = useState(null); // null = closed
   const [resetKey, setResetKey] = useState(0);
+  const [scanning, setScanning] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+  const dataRef = useRef(null);
+  dataRef.current = data;
 
   useEffect(() => {
     loadData().then((stored) => {
-      setData(stored ? { ...fresh(), ...stored } : fresh());
+      setData(stored ? migrate(stored) : fresh());
       SplashScreen.hideAsync().catch(() => {});
       autoCheckForUpdate();
     });
@@ -60,13 +74,75 @@ function Main() {
     });
   }, []);
 
-  const saveExpense = (exp) =>
-    update((d) => {
-      const exists = d.expenses.some((e) => e.id === exp.id);
-      return { ...d, expenses: exists ? d.expenses.map((e) => (e.id === exp.id ? exp : e)) : [exp, ...d.expenses] };
-    });
+  const showToast = (t) => {
+    clearTimeout(toastTimer.current);
+    setToast(t);
+    toastTimer.current = setTimeout(() => setToast(null), t.actionLabel ? 6000 : 3000);
+  };
+
+  // Friendly confirmation after every save: how much is left in that category.
+  const confirmSaved = (exp, d, extra = {}) => {
+    const cat = d.categories.find((c) => c.id === exp.categoryId);
+    const monthOfExp = { y: Number(exp.date.slice(0, 4)), m: Number(exp.date.slice(5, 7)) - 1 };
+    const spentInCat = d.expenses
+      .filter((e) => e.categoryId === exp.categoryId && inMonth(e.date, monthOfExp))
+      .reduce((s, e) => s + e.amount, 0);
+    const left = cat ? cat.planned - spentInCat : 0;
+    const tail = cat ? (left >= 0 ? ` · ${peso(left)} left` : ` · ${peso(-left)} over`) : '';
+    showToast({ message: `${peso(exp.amount)} → ${cat ? cat.name : 'expense'}${tail}`, ...extra });
+  };
+
+  // Saves an expense synchronously so the confirmation can read the updated totals.
+  const commitExpense = (exp, toastExtra) => {
+    const d = dataRef.current;
+    const exists = d.expenses.some((e) => e.id === exp.id);
+    const next = { ...d, expenses: exists ? d.expenses.map((e) => (e.id === exp.id ? exp : e)) : [exp, ...d.expenses] };
+    dataRef.current = next;
+    setData(next);
+    saveData(next);
+    confirmSaved(exp, next, toastExtra);
+  };
+
+  const saveExpense = (exp) => commitExpense(exp);
 
   const deleteExpense = (id) => update((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
+
+  // Snap a receipt → read it on-device → save automatically when we're confident, otherwise ask.
+  const scanReceipt = async (source) => {
+    setExpenseDraft(null);
+    try {
+      const uri = await pickReceiptImage(source);
+      if (!uri) return;
+      setScanning(true);
+      const r = await readReceipt(uri, dataRef.current.categories);
+      setScanning(false);
+      const draft = {
+        amount: r.amount || '',
+        categoryId: r.categoryId,
+        date: r.date || todayISO(),
+        note: r.merchant,
+      };
+      if (r.amount && r.amountConfident && r.categoryId) {
+        const exp = { ...draft, id: uid(), source: 'receipt' };
+        commitExpense(exp, { icon: 'receipt', actionLabel: 'Edit', expense: exp });
+      } else {
+        setExpenseDraft({ ...draft, scan: { amount: r.amount } });
+      }
+    } catch (e) {
+      setScanning(false);
+      if (e && e.code === 'permission') {
+        Alert.alert('Camera access needed', 'Allow camera access to scan receipts.', [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open settings', onPress: () => Linking.openSettings() },
+        ]);
+      } else {
+        Alert.alert("Couldn't read that receipt", 'Try again with better lighting, or add it manually.', [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Add manually', onPress: () => setExpenseDraft({}) },
+        ]);
+      }
+    }
+  };
 
   const resetAll = () => {
     const d = fresh();
@@ -78,7 +154,24 @@ function Main() {
 
   if (!data) return <View style={{ flex: 1, backgroundColor: colors.primary }} />;
 
+  if (!data.setupDone) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <SetupScreen
+          data={data}
+          onFinish={(d) => {
+            setData(d);
+            saveData(d);
+            setTab('home');
+          }}
+        />
+      </>
+    );
+  }
+
   const shared = { data, update, month, setMonth };
+  const tabBarHeight = 64 + Math.max(insets.bottom, 10);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -88,6 +181,7 @@ function Main() {
           <HomeScreen
             {...shared}
             goTo={setTab}
+            onScan={scanReceipt}
             onAddExpense={(draft) => setExpenseDraft(draft || {})}
             onEditExpense={(e) => setExpenseDraft(e)}
           />
@@ -96,6 +190,16 @@ function Main() {
         {tab === 'budget' && <BudgetScreen {...shared} onReset={resetAll} />}
         {tab === 'movein' && <MoveInScreen {...shared} />}
       </View>
+
+      <Toast
+        toast={toast}
+        bottom={tabBarHeight + 12}
+        onAction={() => {
+          const exp = toast && toast.expense;
+          setToast(null);
+          if (exp) setExpenseDraft(dataRef.current.expenses.find((e) => e.id === exp.id) || exp);
+        }}
+      />
 
       <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {TABS.map((t) => {
@@ -127,7 +231,18 @@ function Main() {
         onClose={() => setExpenseDraft(null)}
         onSave={saveExpense}
         onDelete={deleteExpense}
+        onScan={scanReceipt}
       />
+
+      {scanning ? (
+        <View style={styles.scanOverlay}>
+          <View style={styles.scanBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={{ marginTop: 14, fontSize: 16, fontWeight: '700', color: colors.text }}>Reading your receipt…</Text>
+            <Text style={{ marginTop: 4, color: colors.muted, fontSize: 13 }}>This happens on your phone</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -158,4 +273,9 @@ const styles = StyleSheet.create({
     ...shadow,
     elevation: 8,
   },
+  scanOverlay: {
+    position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(15,23,42,0.5)', alignItems: 'center', justifyContent: 'center',
+  },
+  scanBox: { backgroundColor: '#fff', borderRadius: 24, paddingVertical: 28, paddingHorizontal: 36, alignItems: 'center' },
 });

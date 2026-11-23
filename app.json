@@ -33,6 +33,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#0f766e"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Budget Planner uses the camera to scan your receipts.",
+          "photosPermission": "Budget Planner reads photos of receipts you choose.",
+          "microphonePermission": false
+        }
       ]
     ]
   }

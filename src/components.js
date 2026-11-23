@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Pressable, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert,
+  View, Text, TextInput, TouchableOpacity, Pressable, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,20 +162,25 @@ export function DateStepper({ value, onChange }) {
   );
 }
 
-// Add or edit an expense. `initial` may contain { categoryId } or a full expense to edit.
-export function ExpenseModal({ visible, onClose, categories, initial, onSave, onDelete }) {
+// Add or edit an expense. `initial` may contain { categoryId }, a full expense to edit,
+// or a draft from a scanned receipt ({ amount, categoryId, date, note, scan: {...} }).
+export function ExpenseModal({ visible, onClose, categories, initial, onSave, onDelete, onScan }) {
   const editing = !!(initial && initial.id);
+  const scan = initial && initial.scan;
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState(null);
   const [note, setNote] = useState('');
   const [date, setDate] = useState(todayISO());
+  const [more, setMore] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setAmount(initial && initial.amount ? String(initial.amount) : '');
       setCategoryId((initial && initial.categoryId) || null);
       setNote((initial && initial.note) || '');
-      setDate((initial && initial.date) || todayISO());
+      const d = (initial && initial.date) || todayISO();
+      setDate(d);
+      setMore(!!(editing || (initial && initial.note) || d !== todayISO()));
     }
   }, [visible]);
 
@@ -184,27 +189,47 @@ export function ExpenseModal({ visible, onClose, categories, initial, onSave, on
     if (value <= 0) return Alert.alert('Amount needed', 'Enter how much you spent.');
     if (!categoryId) return Alert.alert('Pick a category', 'Tap the category this expense belongs to.');
     if (!isValidISO(date)) return Alert.alert('Check the date', 'That date is not valid.');
-    onSave({ id: editing ? initial.id : uid(), amount: value, categoryId, note: note.trim(), date });
+    const base = editing ? initial : {};
+    onSave({ ...base, id: editing ? initial.id : uid(), amount: value, categoryId, note: note.trim(), date, source: scan ? 'receipt' : base.source });
     onClose();
   };
 
-  return (
-    <SheetModal visible={visible} onClose={onClose} title={editing ? 'Edit expense' : 'New expense'}>
-      <AmountInput value={amount} onChangeText={setAmount} autoFocus={!editing} />
+  const scanMsg = scan
+    ? scan.amount
+      ? 'Read from your receipt. Check the amount and category, then save.'
+      : "Couldn't find the total on that receipt. Please type the amount."
+    : null;
 
-      <Text style={ui.label}>Category</Text>
+  return (
+    <SheetModal visible={visible} onClose={onClose} title={editing ? 'Edit expense' : scan ? 'Check receipt' : 'New expense'}>
+      {!editing && !scan && onScan ? (
+        <View style={[ui.row, { marginTop: 8 }]}>
+          <TouchableOpacity style={[scanBtn, { marginRight: 10 }]} onPress={() => onScan('camera')} activeOpacity={0.8}>
+            <Ionicons name="camera" size={20} color={colors.primary} />
+            <Text style={scanBtnText}>Scan receipt</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={scanBtn} onPress={() => onScan('library')} activeOpacity={0.8}>
+            <Ionicons name="image-outline" size={20} color={colors.primary} />
+            <Text style={scanBtnText}>From photos</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {scanMsg ? (
+        <View style={[ui.row, { marginTop: 8, padding: 12, borderRadius: 14, backgroundColor: scan.amount ? colors.primarySoft : colors.warnSoft }]}>
+          <Ionicons name={scan.amount ? 'receipt-outline' : 'alert-circle-outline'} size={18} color={scan.amount ? colors.primary : colors.warn} />
+          <Text style={{ flex: 1, marginLeft: 8, color: colors.text, fontSize: 13 }}>{scanMsg}</Text>
+        </View>
+      ) : null}
+
+      <AmountInput value={amount} onChangeText={setAmount} autoFocus={!editing && !scan} />
+
+      <Text style={[ui.label, { marginTop: 8 }]}>What was it for?</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
         {categories.map((c) => {
           const active = c.id === categoryId;
           return (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => setCategoryId(c.id)}
-              activeOpacity={0.7}
-              style={{
-                width: '25%', padding: 4,
-              }}
-            >
+            <TouchableOpacity key={c.id} onPress={() => setCategoryId(c.id)} activeOpacity={0.7} style={{ width: '25%', padding: 4 }}>
               <View
                 style={{
                   alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16,
@@ -222,15 +247,23 @@ export function ExpenseModal({ visible, onClose, categories, initial, onSave, on
         })}
       </View>
 
-      <Text style={ui.label}>Date</Text>
-      <DateStepper value={date} onChange={setDate} />
+      {more ? (
+        <>
+          <Text style={ui.label}>Date</Text>
+          <DateStepper value={date} onChange={setDate} />
+          <Text style={ui.label}>Note</Text>
+          <TextInput style={ui.input} value={note} onChangeText={setNote} placeholder="e.g. Meralco bill, Puregold run" placeholderTextColor={colors.muted} />
+        </>
+      ) : (
+        <TouchableOpacity onPress={() => setMore(true)} style={[ui.row, { marginTop: 12, alignSelf: 'center', padding: 6 }]} hitSlop={8}>
+          <Text style={{ color: colors.sub, fontWeight: '600' }}>Today · add note or change date</Text>
+          <Ionicons name="chevron-down" size={16} color={colors.sub} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
+      )}
 
-      <Text style={ui.label}>Note</Text>
-      <TextInput style={ui.input} value={note} onChangeText={setNote} placeholder="Optional — e.g. Meralco bill, Puregold run" placeholderTextColor={colors.muted} />
-
-      <TouchableOpacity style={[ui.btn, { marginTop: 24 }]} onPress={save} activeOpacity={0.85}>
+      <TouchableOpacity style={[ui.btn, { marginTop: 20 }]} onPress={save} activeOpacity={0.85}>
         <Ionicons name="checkmark" size={20} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={ui.btnText}>{editing ? 'Save changes' : 'Add expense'}</Text>
+        <Text style={ui.btnText}>{editing ? 'Save changes' : 'Save'}</Text>
       </TouchableOpacity>
       {editing && onDelete ? (
         <TouchableOpacity
@@ -247,6 +280,40 @@ export function ExpenseModal({ visible, onClose, categories, initial, onSave, on
         </TouchableOpacity>
       ) : null}
     </SheetModal>
+  );
+}
+
+const scanBtn = {
+  flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+  paddingVertical: 12, borderRadius: 14, backgroundColor: colors.primarySoft,
+};
+const scanBtnText = { marginLeft: 8, color: colors.primaryDark, fontWeight: '700' };
+
+// Small message that slides up from the bottom, with an optional action (e.g. "Edit").
+export function Toast({ toast, onAction, bottom }) {
+  const [anim] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    Animated.timing(anim, { toValue: toast ? 1 : 0, duration: 220, useNativeDriver: true }).start();
+  }, [toast]);
+  if (!toast) return null;
+  return (
+    <Animated.View
+      pointerEvents="box-none"
+      style={{
+        position: 'absolute', left: 16, right: 16, bottom,
+        opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+      }}
+    >
+      <View style={[ui.row, { backgroundColor: colors.text, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14 }]}>
+        <Ionicons name={toast.icon || 'checkmark-circle'} size={20} color="#5eead4" />
+        <Text style={{ flex: 1, color: '#fff', marginLeft: 10, fontSize: 14 }}>{toast.message}</Text>
+        {toast.actionLabel ? (
+          <TouchableOpacity onPress={onAction} hitSlop={10} style={{ paddingLeft: 10 }}>
+            <Text style={{ color: '#5eead4', fontWeight: '800' }}>{toast.actionLabel}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    </Animated.View>
   );
 }
 

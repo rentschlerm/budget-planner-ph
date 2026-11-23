@@ -48,7 +48,7 @@ export default function BudgetScreen({ data, update, onReset }) {
 
   return (
     <View style={ui.screen}>
-      <ScreenHeader title="Budget" subtitle="Give every peso a job" />
+      <ScreenHeader title="Your plan" subtitle="Tap any amount to change it" />
       <ScrollView contentContainerStyle={ui.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={ui.card}>
           <View style={ui.row}>
@@ -150,6 +150,17 @@ export default function BudgetScreen({ data, update, onReset }) {
 
         <Text style={[ui.label, { marginLeft: 4 }]}>App</Text>
         <View style={[ui.card, { paddingVertical: 4 }]}>
+          <SettingRow
+            icon="sparkles-outline"
+            label="Redo quick setup"
+            onPress={() =>
+              Alert.alert('Redo quick setup?', 'Your categories will be rebuilt from 3 questions. Your expense history stays.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Continue', onPress: () => update((d) => ({ ...d, setupDone: false })) },
+              ])
+            }
+          />
+          <View style={{ height: 1, backgroundColor: colors.track }} />
           <SettingRow icon="cloud-download-outline" label="Check for updates" detail={`v${currentVersion()}`} onPress={manualCheckForUpdate} />
           <View style={{ height: 1, backgroundColor: colors.track }} />
           <SettingRow
