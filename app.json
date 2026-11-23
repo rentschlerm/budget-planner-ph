@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Budget Planner PH",
+    "slug": "budget-planner-ph",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.rentschler.budgetplannerph",
+      "versionCode": 1,
+      "edgeToEdgeEnabled": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rentschler.budgetplannerph"
+    }
+  }
+}
