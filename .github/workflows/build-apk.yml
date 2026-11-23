@@ -46,6 +46,13 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Diagnose build failure
+        if: failure()
+        run: |
+          npm ls expo expo-splash-screen @expo/vector-icons expo-modules-autolinking expo-modules-core --all 2>&1 | head -60 || true
+          npx expo-modules-autolinking resolve --platform android --json > /tmp/al.json 2>&1 || true
+          node -e "const j=require('/tmp/al.json'); j.modules.forEach((m,i)=>console.log(i, m.packageName, m.packageVersion, JSON.stringify(m.projects.map(p=>p.publication||null))))" || head -c 3000 /tmp/al.json
+
       - name: Rename APK
         run: mv android/app/build/outputs/apk/release/app-release.apk "budget-planner-${VERSION}.apk"
 
