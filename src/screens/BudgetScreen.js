@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { KeyboardScrollView, Input } from '../keyboard';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, ui } from '../theme';
 import { GROUPS, ICON_CHOICES } from '../defaults';
@@ -49,7 +50,7 @@ export default function BudgetScreen({ data, update, onReset }) {
   return (
     <View style={ui.screen}>
       <ScreenHeader title="Your plan" subtitle="Tap any amount to change it" />
-      <ScrollView contentContainerStyle={ui.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardScrollView contentContainerStyle={ui.content} showsVerticalScrollIndicator={false}>
         <View style={ui.card}>
           <View style={ui.row}>
             <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: colors.goodSoft, alignItems: 'center', justifyContent: 'center' }}>
@@ -62,7 +63,7 @@ export default function BudgetScreen({ data, update, onReset }) {
           </View>
           <View style={[ui.row, ui.input, { marginTop: 14, paddingVertical: 4 }]}>
             <Text style={{ fontSize: 22, fontWeight: '700', color: colors.muted, marginRight: 6 }}>₱</Text>
-            <TextInput
+            <Input
               style={{ flex: 1, fontSize: 24, fontWeight: '800', color: colors.text, paddingVertical: 8 }}
               keyboardType="decimal-pad"
               value={incomeText}
@@ -177,7 +178,7 @@ export default function BudgetScreen({ data, update, onReset }) {
         </View>
 
         <CategoryModal visible={!!editing} category={editing} onClose={() => setEditing(null)} onSave={saveCategory} onDelete={deleteCategory} />
-      </ScrollView>
+      </KeyboardScrollView>
     </View>
   );
 }
@@ -224,7 +225,7 @@ function CategoryModal({ visible, category, onClose, onSave, onDelete }) {
       <Text style={[ui.muted, { textAlign: 'center', marginTop: -4 }]}>per month</Text>
 
       <Text style={ui.label}>Name</Text>
-      <TextInput style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Laundry" placeholderTextColor={colors.muted} />
+      <Input style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Laundry" placeholderTextColor={colors.muted} />
 
       <Text style={ui.label}>Type</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>

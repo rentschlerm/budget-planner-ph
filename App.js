@@ -10,6 +10,7 @@ import { DEFAULT_DATA } from './src/defaults';
 import { currentMonth, todayISO, peso, uid, inMonth } from './src/utils';
 import { colors, shadow } from './src/theme';
 import { ExpenseModal, Toast } from './src/components';
+import { KeyboardSafeView } from './src/keyboard';
 import { autoCheckForUpdate } from './src/updater';
 import { pickReceiptImage, readReceipt } from './src/receipt';
 import HomeScreen from './src/screens/HomeScreen';
@@ -176,7 +177,7 @@ function Main() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style={tab === 'home' ? 'light' : 'dark'} />
-      <View style={{ flex: 1 }} key={resetKey}>
+      <KeyboardSafeView key={resetKey}>
         {tab === 'home' && (
           <HomeScreen
             {...shared}
@@ -189,7 +190,7 @@ function Main() {
         {tab === 'expenses' && <ExpensesScreen {...shared} onEditExpense={(e) => setExpenseDraft(e)} />}
         {tab === 'budget' && <BudgetScreen {...shared} onReset={resetAll} />}
         {tab === 'movein' && <MoveInScreen {...shared} />}
-      </View>
+      </KeyboardSafeView>
 
       <Toast
         toast={toast}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { KeyboardScrollView, Input } from '../keyboard';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, ui } from '../theme';
 import { peso, toNumber, uid } from '../utils';
@@ -47,7 +48,7 @@ export default function MoveInScreen({ data, update }) {
   return (
     <View style={ui.screen}>
       <ScreenHeader title="Move-in fund" subtitle="One-time costs to get you moved in" />
-      <ScrollView contentContainerStyle={ui.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardScrollView contentContainerStyle={ui.content} showsVerticalScrollIndicator={false}>
         <View style={[ui.card, { backgroundColor: colors.primaryDark }]}>
           <View style={ui.between}>
             <View style={{ flex: 1 }}>
@@ -82,7 +83,7 @@ export default function MoveInScreen({ data, update }) {
           <Text style={ui.muted}>Money you've saved but haven't spent yet</Text>
           <View style={[ui.row, ui.input, { marginTop: 12, paddingVertical: 2 }]}>
             <Text style={{ fontSize: 18, fontWeight: '700', color: colors.muted, marginRight: 6 }}>₱</Text>
-            <TextInput
+            <Input
               style={{ flex: 1, fontSize: 18, fontWeight: '700', color: colors.text, paddingVertical: 10 }}
               keyboardType="decimal-pad"
               value={savedText}
@@ -110,7 +111,7 @@ export default function MoveInScreen({ data, update }) {
         </TouchableOpacity>
 
         <ItemModal visible={!!editing} item={editing} onClose={() => setEditing(null)} onSave={saveItem} onDelete={deleteItem} />
-      </ScrollView>
+      </KeyboardScrollView>
     </View>
   );
 }
@@ -192,7 +193,7 @@ function ItemModal({ visible, item, onClose, onSave, onDelete }) {
       <AmountInput value={amount} onChangeText={setAmount} autoFocus={isNew} />
       <Text style={[ui.muted, { textAlign: 'center', marginTop: -4 }]}>estimated cost</Text>
       <Text style={ui.label}>Item</Text>
-      <TextInput style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Curtains" placeholderTextColor={colors.muted} />
+      <Input style={ui.input} value={name} onChangeText={setName} placeholder="e.g. Curtains" placeholderTextColor={colors.muted} />
       <TouchableOpacity style={[ui.btn, { marginTop: 24 }]} onPress={save} activeOpacity={0.85}>
         <Text style={ui.btnText}>Save</Text>
       </TouchableOpacity>

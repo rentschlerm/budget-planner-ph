@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { KeyboardSafeView, KeyboardScrollView, Input } from '../keyboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, ui } from '../theme';
@@ -37,8 +38,8 @@ export default function SetupScreen({ data, onFinish }) {
   const canNext = step === 0 || (step === 1 && payN > 0) || (step === 2 && rentN + billsN < payN) || step === 3;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 16, paddingHorizontal: 24, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeView style={{ backgroundColor: colors.bg }}>
+      <KeyboardScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 16, paddingHorizontal: 24, paddingBottom: Math.max(insets.bottom, 12) + 12 }}>
         {/* Progress dots */}
         <View style={[ui.between, { marginBottom: 32 }]}>
           <View style={ui.row}>
@@ -133,8 +134,8 @@ export default function SetupScreen({ data, onFinish }) {
             <Text style={ui.btnText}>{step === 0 ? "Let's go" : step === 3 ? 'Looks good — start!' : 'Next'}</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardScrollView>
+    </KeyboardSafeView>
   );
 }
 
@@ -155,7 +156,7 @@ function BigMoney({ value, onChange, placeholder }) {
   return (
     <View style={[ui.row, { borderBottomWidth: 2, borderBottomColor: colors.primary, paddingBottom: 6, marginTop: 12 }]}>
       <Text style={{ fontSize: 36, fontWeight: '700', color: colors.muted, marginRight: 8 }}>₱</Text>
-      <TextInput
+      <Input
         style={{ flex: 1, fontSize: 40, fontWeight: '800', color: colors.text, padding: 0 }}
         value={value}
         onChangeText={onChange}
@@ -172,7 +173,7 @@ function MoneyField({ value, onChange, placeholder }) {
   return (
     <View style={[ui.row, ui.input, { paddingVertical: 2 }]}>
       <Text style={{ fontSize: 20, fontWeight: '700', color: colors.muted, marginRight: 6 }}>₱</Text>
-      <TextInput
+      <Input
         style={{ flex: 1, fontSize: 20, fontWeight: '700', color: colors.text, paddingVertical: 10 }}
         value={value}
         onChangeText={onChange}

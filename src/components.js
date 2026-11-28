@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Pressable, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert, Animated,
+  View, Text, TouchableOpacity, Pressable, Modal, Alert, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, ui } from './theme';
 import { GROUPS } from './defaults';
+import { KeyboardSafeView, KeyboardScrollView, Input } from './keyboard';
 import { todayISO, toISODate, toNumber, isValidISO, uid, prettyDate } from './utils';
 
 export function ProgressBar({ value, max, color = colors.primary, height = 8, track = colors.track }) {
@@ -88,9 +89,9 @@ export function SheetModal({ visible, onClose, title, children }) {
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardSafeView style={{ justifyContent: 'flex-end', paddingTop: insets.top + 24 }}>
         <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(15,23,42,0.45)' }} onPress={onClose} />
-        <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%' }}>
+        <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '100%', flexShrink: 1 }}>
           <View style={{ alignItems: 'center', paddingTop: 10 }}>
             <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border }} />
           </View>
@@ -104,14 +105,11 @@ export function SheetModal({ visible, onClose, title, children }) {
               <Ionicons name="close" size={20} color={colors.sub} />
             </TouchableOpacity>
           </View>
-          <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
-            keyboardShouldPersistTaps="handled"
-          >
+          <KeyboardScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}>
             {children}
-          </ScrollView>
+          </KeyboardScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -121,7 +119,7 @@ export function AmountInput({ value, onChangeText, autoFocus }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 }}>
       <Text style={{ fontSize: 34, fontWeight: '700', color: colors.muted, marginRight: 4 }}>₱</Text>
-      <TextInput
+      <Input
         style={{ fontSize: 44, fontWeight: '800', color: colors.text, minWidth: 80, textAlign: 'center', padding: 0 }}
         value={value}
         onChangeText={onChangeText}
@@ -252,7 +250,7 @@ export function ExpenseModal({ visible, onClose, categories, initial, onSave, on
           <Text style={ui.label}>Date</Text>
           <DateStepper value={date} onChange={setDate} />
           <Text style={ui.label}>Note</Text>
-          <TextInput style={ui.input} value={note} onChangeText={setNote} placeholder="e.g. Meralco bill, Puregold run" placeholderTextColor={colors.muted} />
+          <Input style={ui.input} value={note} onChangeText={setNote} placeholder="e.g. Meralco bill, Puregold run" placeholderTextColor={colors.muted} />
         </>
       ) : (
         <TouchableOpacity onPress={() => setMore(true)} style={[ui.row, { marginTop: 12, alignSelf: 'center', padding: 6 }]} hitSlop={8}>
